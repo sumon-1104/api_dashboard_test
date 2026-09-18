@@ -10,7 +10,8 @@ export interface UsageSummaryRow {
   cached_tokens: number;
   total_tokens: number;
   credits_used: number;
-  estimated_cost: number;
+  // null when nothing summed has a known cost — never a fabricated 0.
+  estimated_cost: number | null;
   request_count: number;
 }
 
@@ -20,7 +21,7 @@ export interface UsageTimelineRow {
   input_tokens: number;
   output_tokens: number;
   total_tokens: number;
-  estimated_cost: number;
+  estimated_cost: number | null;
   request_count: number;
 }
 
@@ -30,7 +31,7 @@ export interface UsageByModelRow {
   input_tokens: number;
   output_tokens: number;
   total_tokens: number;
-  estimated_cost: number;
+  estimated_cost: number | null;
   request_count: number;
 }
 

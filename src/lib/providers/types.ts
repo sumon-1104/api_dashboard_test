@@ -64,7 +64,10 @@ export interface RateLimitEntry {
 export interface TestConnectionResult {
   ok: boolean;
   message: string;
-  raw?: unknown;
+  // Set only when the test itself was a real, billable call whose response
+  // exposed genuine per-call usage (e.g. Gemini's generateContent ping) —
+  // the caller persists this as a 'self_logged' usage_records row.
+  usageSample?: UsageTokensBucket;
 }
 
 /**

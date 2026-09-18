@@ -1,21 +1,29 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { ProviderStatus } from "@/components/providers/provider-status";
 import { RemainingQuota } from "@/components/usage/remaining-quota";
-import { formatUsd } from "@/lib/costs";
+import { formatUsd, type CostSource } from "@/lib/costs";
 import type { Provider } from "@/types/database";
 import type { RemainingQuota as RemainingQuotaValue } from "@/lib/usage/remaining";
+
+const COST_SOURCE_LABEL: Partial<Record<CostSource, string>> = {
+  provider_reported: "Source: Provider",
+  application_calculated: "Source: Calculated",
+};
 
 export function ProviderOverviewCard({
   provider,
   totalTokens,
   requestCount,
   costUsd,
+  costSource,
   remaining,
 }: {
   provider: Provider;
   totalTokens: number;
   requestCount: number;
   costUsd: number | null;
+  costSource: CostSource;
   remaining: RemainingQuotaValue;
 }) {
   return (
@@ -35,7 +43,10 @@ export function ProviderOverviewCard({
             <p className="font-medium">{requestCount.toLocaleString()}</p>
           </div>
           <div className="col-span-2">
-            <p className="text-muted-foreground">Cost (this period)</p>
+            <div className="flex items-center justify-between">
+              <p className="text-muted-foreground">Cost (this period)</p>
+              {COST_SOURCE_LABEL[costSource] && <Badge variant="secondary">{COST_SOURCE_LABEL[costSource]}</Badge>}
+            </div>
             <p className="font-medium">{formatUsd(costUsd)}</p>
           </div>
         </div>

@@ -10,7 +10,7 @@ function startOfUtcDay(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
-async function resolveModelId(admin: AdminClient, providerId: string, modelName: string | null): Promise<string | null> {
+export async function resolveModelId(admin: AdminClient, providerId: string, modelName: string | null): Promise<string | null> {
   if (!modelName) return null;
 
   const { data: existing } = await admin

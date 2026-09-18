@@ -56,10 +56,19 @@ export class GeminiProvider implements AIProvider {
           }),
         }
       );
+      const usage = res.usageMetadata;
       return {
         ok: true,
         message: "Connected. This ping's usageMetadata was logged as a self-logged sample only.",
-        raw: res.usageMetadata,
+        usageSample: {
+          modelName: "gemini-flash-latest",
+          inputTokens: usage?.promptTokenCount ?? 0,
+          outputTokens: usage?.candidatesTokenCount ?? 0,
+          cachedTokens: usage?.cachedContentTokenCount ?? 0,
+          reasoningTokens: usage?.thoughtsTokenCount ?? 0,
+          totalTokens: usage?.totalTokenCount ?? 0,
+          requestCount: 1,
+        },
       };
     } catch (err) {
       if (err instanceof ProviderHttpError && (err.status === 401 || err.status === 403)) {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ export interface ProviderWithCredentials extends Provider {
 }
 
 export function ProviderCard({ provider }: { provider: ProviderWithCredentials }) {
+  const router = useRouter();
   const [keyInput, setKeyInput] = useState("");
   const [showKeyField, setShowKeyField] = useState(provider.credentials.length === 0);
   const [isPending, startTransition] = useTransition();
@@ -37,6 +39,7 @@ export function ProviderCard({ provider }: { provider: ProviderWithCredentials }
       } else {
         toast.error(`${provider.name}: ${body.message ?? "Connection failed"}`);
       }
+      router.refresh();
     });
   }
 
@@ -52,6 +55,7 @@ export function ProviderCard({ provider }: { provider: ProviderWithCredentials }
         toast.success(`${provider.name} API key saved.`);
         setKeyInput("");
         setShowKeyField(false);
+        router.refresh();
       } else {
         const body = await res.json();
         toast.error(body.error ?? "Failed to save key");
@@ -67,6 +71,7 @@ export function ProviderCard({ provider }: { provider: ProviderWithCredentials }
         body: JSON.stringify({ enabled }),
       });
       if (!res.ok) toast.error("Failed to update provider");
+      router.refresh();
     });
   }
 

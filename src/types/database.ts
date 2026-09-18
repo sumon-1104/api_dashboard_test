@@ -131,7 +131,9 @@ export interface UsageSummaryByProviderRow {
   cached_tokens: number;
   total_tokens: number;
   credits_used: number;
-  estimated_cost: number;
+  // null when no summed row has a known cost (e.g. Gemini) — never a
+  // fabricated 0. See supabase/migrations/0003_fix_estimated_cost_unknown.sql.
+  estimated_cost: number | null;
   request_count: number;
 }
 
@@ -141,7 +143,7 @@ export interface UsageTimelineFnRow {
   input_tokens: number;
   output_tokens: number;
   total_tokens: number;
-  estimated_cost: number;
+  estimated_cost: number | null;
   request_count: number;
 }
 
@@ -151,7 +153,7 @@ export interface UsageByModelFnRow {
   input_tokens: number;
   output_tokens: number;
   total_tokens: number;
-  estimated_cost: number;
+  estimated_cost: number | null;
   request_count: number;
 }
 

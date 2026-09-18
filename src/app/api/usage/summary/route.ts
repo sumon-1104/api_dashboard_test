@@ -22,7 +22,7 @@ export async function GET(request: Request) {
       inputTokens: acc.inputTokens + Number(r.input_tokens),
       outputTokens: acc.outputTokens + Number(r.output_tokens),
       totalTokens: acc.totalTokens + Number(r.total_tokens),
-      estimatedCost: acc.estimatedCost + Number(r.estimated_cost),
+      estimatedCost: acc.estimatedCost + Number(r.estimated_cost ?? 0),
       requestCount: acc.requestCount + Number(r.request_count),
     }),
     { inputTokens: 0, outputTokens: 0, totalTokens: 0, estimatedCost: 0, requestCount: 0 }

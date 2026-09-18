@@ -26,7 +26,7 @@ export function toDailyTotals(rows: UsageTimelineRow[]): DailyTotals[] {
     existing.outputTokens += Number(row.output_tokens);
     existing.totalTokens += Number(row.total_tokens);
     existing.requestCount += Number(row.request_count);
-    existing.estimatedCost += Number(row.estimated_cost);
+    existing.estimatedCost += Number(row.estimated_cost ?? 0);
     byDay.set(row.bucket, existing);
   }
 
