@@ -1,5 +1,35 @@
-import { describe, expect, it } from "vitest";
-import { newlyCrossedThresholds, periodKeyFor } from "./alerts";
+import { afterEach, describe, expect, it } from "vitest";
+import { getAlertThresholds, newlyCrossedThresholds, periodKeyFor } from "./alerts";
+
+afterEach(() => {
+  delete process.env.ALERT_THRESHOLD_PCTS;
+});
+
+describe("getAlertThresholds", () => {
+  it("defaults to the 4-tier escalation when unset", () => {
+    expect(getAlertThresholds()).toEqual([50, 75, 90, 100]);
+  });
+
+  it("parses a single configured threshold", () => {
+    process.env.ALERT_THRESHOLD_PCTS = "80";
+    expect(getAlertThresholds()).toEqual([80]);
+  });
+
+  it("parses, dedupes, and sorts a comma-separated list", () => {
+    process.env.ALERT_THRESHOLD_PCTS = "90, 50, 50, 75";
+    expect(getAlertThresholds()).toEqual([50, 75, 90]);
+  });
+
+  it("falls back to the default on unparseable input", () => {
+    process.env.ALERT_THRESHOLD_PCTS = "not-a-number";
+    expect(getAlertThresholds()).toEqual([50, 75, 90, 100]);
+  });
+
+  it("ignores out-of-range values but keeps valid ones from the same list", () => {
+    process.env.ALERT_THRESHOLD_PCTS = "0,150,80,-10";
+    expect(getAlertThresholds()).toEqual([80]);
+  });
+});
 
 describe("newlyCrossedThresholds", () => {
   it("fires every threshold at or below current usage on a fresh period", () => {

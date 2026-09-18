@@ -1,29 +1,33 @@
 import { NextResponse } from "next/server";
 import { requireApiUser } from "@/lib/auth/session";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getProviderClient, PROVIDER_KEY_TYPE } from "@/lib/providers/registry";
+import { getProviderClient } from "@/lib/providers/registry";
 import { ProviderCredentialError } from "@/lib/providers/types";
 import { resolveModelId } from "@/lib/usage/poll";
 
-export async function POST(_request: Request, context: RouteContext<"/api/providers/[provider]/test">) {
+// Tests one specific credential ("project") rather than "the provider" —
+// a provider can now have several projects, each with its own key.
+export async function POST(
+  _request: Request,
+  context: RouteContext<"/api/providers/[provider]/credentials/[credentialId]/test">
+) {
   const auth = await requireApiUser();
   if ("unauthorized" in auth) return auth.unauthorized;
 
-  const { provider: slug } = await context.params;
+  const { provider: slug, credentialId } = await context.params;
   const admin = createAdminClient();
 
   try {
-    const client = await getProviderClient(slug);
+    const { client } = await getProviderClient(slug, credentialId);
     const result = await client.testConnection();
+
+    await admin
+      .from("provider_credentials")
+      .update({ status: result.ok ? "valid" : "invalid", last_tested_at: new Date().toISOString() })
+      .eq("id", credentialId);
 
     const { data: provider } = await admin.from("providers").select("id").eq("slug", slug).single();
     if (provider) {
-      await admin
-        .from("provider_credentials")
-        .update({ status: result.ok ? "valid" : "invalid", last_tested_at: new Date().toISOString() })
-        .eq("provider_id", provider.id)
-        .eq("key_type", PROVIDER_KEY_TYPE[slug] ?? "standard");
-
       await admin
         .from("providers")
         .update({ status: result.ok ? "connected" : "error" })
@@ -33,6 +37,7 @@ export async function POST(_request: Request, context: RouteContext<"/api/provid
         const modelId = await resolveModelId(admin, provider.id, result.usageSample.modelName);
         await admin.from("usage_records").insert({
           provider_id: provider.id,
+          credential_id: credentialId,
           model_id: modelId,
           source: "self_logged",
           input_tokens: result.usageSample.inputTokens,

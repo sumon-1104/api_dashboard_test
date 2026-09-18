@@ -52,6 +52,7 @@ export type Model = {
 export type UsageRecord = {
   id: string;
   provider_id: string;
+  credential_id: string | null;
   model_id: string | null;
   source: UsageSource;
   request_id: string | null;
@@ -83,6 +84,7 @@ export type UsageLimit = {
 export type RateLimit = {
   id: string;
   provider_id: string;
+  credential_id: string | null;
   model_id: string | null;
   limit_type: RateLimitType;
   current_usage: number | null;

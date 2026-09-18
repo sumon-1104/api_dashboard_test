@@ -24,12 +24,43 @@ const PROVIDER_FACTORIES: Record<string, (key: string) => AIProvider> = {
   gemini: (key) => new GeminiProvider(key),
 };
 
+export interface LoadedProviderClient {
+  client: AIProvider;
+  credentialId: string;
+}
+
 /**
- * Loads the provider's row + its decrypted credential and returns a ready
- * AIProvider instance. Always goes through the service-role client — this is
- * the only place `provider_credentials.encrypted_api_key` is ever read.
+ * Lists every stored credential ("project") for a provider slug's key type,
+ * oldest first. A provider can have multiple — each is a separate project
+ * under the same platform (e.g. two OpenAI orgs), polled independently.
  */
-export async function getProviderClient(slug: string): Promise<AIProvider> {
+export async function listProviderCredentials(
+  slug: string
+): Promise<{ id: string; name: string }[]> {
+  const admin = createAdminClient();
+  const { data: provider } = await admin.from("providers").select("id").eq("slug", slug).single();
+  if (!provider) return [];
+
+  const keyType = PROVIDER_KEY_TYPE[slug] ?? "standard";
+  const { data: credentials } = await admin
+    .from("provider_credentials")
+    .select("id, name")
+    .eq("provider_id", provider.id)
+    .eq("key_type", keyType)
+    .order("created_at", { ascending: true });
+
+  return credentials ?? [];
+}
+
+/**
+ * Loads one specific credential's decrypted key and returns a ready
+ * AIProvider instance for it. Always goes through the service-role client —
+ * this is the only place `provider_credentials.encrypted_api_key` is ever
+ * read. Without `credentialId`, falls back to the most recently added
+ * credential (used by callers that haven't been updated to target a specific
+ * project yet).
+ */
+export async function getProviderClient(slug: string, credentialId?: string): Promise<LoadedProviderClient> {
   const factory = PROVIDER_FACTORIES[slug];
   if (!factory) {
     throw new ProviderCredentialError(`No provider client registered for slug "${slug}"`);
@@ -47,14 +78,17 @@ export async function getProviderClient(slug: string): Promise<AIProvider> {
   }
 
   const keyType = PROVIDER_KEY_TYPE[slug] ?? "standard";
-  const { data: credential, error: credentialError } = await admin
+  let query = admin
     .from("provider_credentials")
-    .select("encrypted_api_key")
+    .select("id, encrypted_api_key")
     .eq("provider_id", provider.id)
-    .eq("key_type", keyType)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .eq("key_type", keyType);
+
+  query = credentialId
+    ? query.eq("id", credentialId)
+    : query.order("created_at", { ascending: false }).limit(1);
+
+  const { data: credential, error: credentialError } = await query.maybeSingle();
 
   if (credentialError || !credential) {
     throw new ProviderCredentialError(
@@ -63,7 +97,7 @@ export async function getProviderClient(slug: string): Promise<AIProvider> {
   }
 
   const apiKey = decrypt(credential.encrypted_api_key);
-  return factory(apiKey);
+  return { client: factory(apiKey), credentialId: credential.id };
 }
 
 export function listSupportedProviderSlugs(): string[] {

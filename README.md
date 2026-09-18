@@ -69,6 +69,7 @@ Fill in:
 | `ENCRYPTION_KEY` | `openssl rand -hex 32` — 32 bytes, AES-256-GCM key for stored provider credentials |
 | `CRON_SECRET` | `openssl rand -hex 32` — shared secret the scheduler sends to `/api/cron/poll-usage` |
 | `SLACK_WEBHOOK_URL` | Optional — see [Slack alerts](#slack-alerts) |
+| `ALERT_THRESHOLD_PCTS` | Optional — comma-separated usage-percent thresholds, defaults to `50,75,90,100` |
 
 ### 5. Seed the providers
 
@@ -162,10 +163,11 @@ Slack API → your app → Incoming Webhooks → Add New Webhook to Workspace �
 resulting URL (`https://hooks.slack.com/services/...`) as `SLACK_WEBHOOK_URL`. If it's unset, alerts
 still appear on the Settings page — the cron job never fails over a missing webhook.
 
-Thresholds are fixed at 50/75/90/100% of whatever "remaining" figure is genuinely known for a
-provider (an admin-configured limit on the Limits page, or a provider-reported balance for a future
-provider like DeepSeek). Each threshold fires Slack once per period — see `CLAUDE.md` § Alerts for
-the de-duplication mechanism.
+Thresholds default to 50/75/90/100% of whatever "remaining" figure is genuinely known for a provider
+(an admin-configured limit on the Limits page, or a provider-reported balance for a future provider
+like DeepSeek). Override with `ALERT_THRESHOLD_PCTS` (comma-separated, e.g. `80` for a single flat
+threshold instead of the 4-tier escalation). Each threshold fires Slack once per period — see
+`CLAUDE.md` § Alerts for the de-duplication mechanism.
 
 ## Local dev
 

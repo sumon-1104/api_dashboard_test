@@ -147,8 +147,9 @@ and always carries which source produced the number.
 ## Alerts
 
 `lib/usage/alerts.ts` (pure, unit-tested) + `lib/usage/evaluate-alerts.ts` (DB-wired, called from the
-cron route after every poll). Thresholds are fixed at 50/75/90/100% used. De-duplication is the part
-that matters: the `alerts` table has a unique constraint on
+cron route after every poll). Thresholds default to 50/75/90/100% used, overridable via the
+`ALERT_THRESHOLD_PCTS` env var (comma-separated, e.g. `80` for a single flat threshold). De-duplication
+is the part that matters: the `alerts` table has a unique constraint on
 `(provider_id, limit_type, threshold_pct, period_key)`; the cron job upserts with
 `ignoreDuplicates: true` and only sends Slack when the insert actually landed a new row. A new period
 (`period_key` rolls over) or a higher threshold can fire again — the same one within the same period
