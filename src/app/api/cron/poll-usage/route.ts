@@ -14,7 +14,29 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
 
-  const polled = await Promise.all(POLLABLE_PROVIDER_SLUGS.map((slug) => pollProvider(admin, slug)));
+  // Polls every project's pollable provider row, system-wide — not scoped to
+  // any one user, since this runs with the service-role client and bypasses
+  // per-project RLS entirely.
+  const { data: rows } = await admin
+    .from("providers")
+    .select("id, slug")
+    .in("slug", POLLABLE_PROVIDER_SLUGS)
+    .eq("enabled", true);
+
+  // allSettled, not all: one project's provider throwing must not abort every
+  // other project's poll in the same system-wide run.
+  const settled = await Promise.allSettled((rows ?? []).map((p) => pollProvider(admin, p.id, p.slug)));
+  const polled = settled.map((result, i) =>
+    result.status === "fulfilled"
+      ? result.value
+      : {
+          slug: rows![i].slug,
+          polled: false,
+          modelsSeen: 0,
+          totalCostUsd: null,
+          message: result.reason instanceof Error ? result.reason.message : "Poll failed",
+        }
+  );
   const alerts = await evaluateAlerts(admin);
 
   return NextResponse.json({ polled, alerts, ranAt: new Date().toISOString() });

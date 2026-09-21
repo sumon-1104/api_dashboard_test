@@ -4,7 +4,7 @@ import { shouldRedirectToDashboard, shouldRedirectToLogin } from "./redirect-rul
 describe("shouldRedirectToLogin", () => {
   it("redirects an unauthenticated visitor away from /dashboard/*", () => {
     expect(shouldRedirectToLogin("/dashboard", false)).toBe(true);
-    expect(shouldRedirectToLogin("/dashboard/providers", false)).toBe(true);
+    expect(shouldRedirectToLogin("/dashboard/projects", false)).toBe(true);
   });
 
   it("does not redirect an authenticated user", () => {

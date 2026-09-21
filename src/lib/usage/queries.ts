@@ -35,8 +35,24 @@ export interface UsageByModelRow {
   request_count: number;
 }
 
-export async function getProviders(supabase: Client) {
-  const { data, error } = await supabase.from("providers").select("*").order("name");
+// projectId/providerId here are a UX narrowing filter layered on top of RLS,
+// not a security boundary — RLS already guarantees a caller only ever sees
+// their own rows regardless of these params (see CLAUDE.md § Database rules).
+export interface UsageFilter {
+  projectId?: string;
+  providerId?: string;
+}
+
+export async function getProjects(supabase: Client) {
+  const { data, error } = await supabase.from("projects").select("*").order("created_at", { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+export async function getProviders(supabase: Client, projectId?: string) {
+  let query = supabase.from("providers").select("*").order("name");
+  if (projectId) query = query.eq("project_id", projectId);
+  const { data, error } = await query;
   if (error) throw error;
   return data;
 }
@@ -49,11 +65,14 @@ export async function getModels(supabase: Client) {
 
 export async function getUsageSummaryByProvider(
   supabase: Client,
-  range: { start: Date; end: Date }
+  range: { start: Date; end: Date },
+  filter: UsageFilter = {}
 ): Promise<UsageSummaryRow[]> {
   const { data, error } = await supabase.rpc("usage_summary_by_provider", {
     p_start: range.start.toISOString(),
     p_end: range.end.toISOString(),
+    p_project_id: filter.projectId ?? null,
+    p_provider_id: filter.providerId ?? null,
   });
   if (error) throw error;
   return (data ?? []) as UsageSummaryRow[];
@@ -62,12 +81,13 @@ export async function getUsageSummaryByProvider(
 export async function getUsageTimeline(
   supabase: Client,
   range: { start: Date; end: Date },
-  providerId?: string
+  filter: UsageFilter = {}
 ): Promise<UsageTimelineRow[]> {
   const { data, error } = await supabase.rpc("usage_timeline", {
     p_start: range.start.toISOString(),
     p_end: range.end.toISOString(),
-    p_provider_id: providerId ?? null,
+    p_project_id: filter.projectId ?? null,
+    p_provider_id: filter.providerId ?? null,
   });
   if (error) throw error;
   return (data ?? []) as UsageTimelineRow[];
@@ -75,11 +95,14 @@ export async function getUsageTimeline(
 
 export async function getUsageByModel(
   supabase: Client,
-  range: { start: Date; end: Date }
+  range: { start: Date; end: Date },
+  filter: UsageFilter = {}
 ): Promise<UsageByModelRow[]> {
   const { data, error } = await supabase.rpc("usage_by_model", {
     p_start: range.start.toISOString(),
     p_end: range.end.toISOString(),
+    p_project_id: filter.projectId ?? null,
+    p_provider_id: filter.providerId ?? null,
   });
   if (error) throw error;
   return (data ?? []) as UsageByModelRow[];
@@ -99,7 +122,7 @@ export async function getRateLimits(supabase: Client) {
 
 export async function getRecentErrors(
   supabase: Client,
-  opts: { page?: number; pageSize?: number; providerId?: string } = {}
+  opts: { page?: number; pageSize?: number; providerId?: string; providerIds?: string[] } = {}
 ) {
   const page = opts.page ?? 1;
   const pageSize = opts.pageSize ?? 25;
@@ -113,6 +136,7 @@ export async function getRecentErrors(
     .range(from, to);
 
   if (opts.providerId) query = query.eq("provider_id", opts.providerId);
+  else if (opts.providerIds) query = query.in("provider_id", opts.providerIds);
 
   const { data, error, count } = await query;
   if (error) throw error;

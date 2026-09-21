@@ -1,27 +1,36 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { getModels, getProviders, getRecentErrors } from "@/lib/usage/queries";
+import { getModels, getProjects, getProviders, getRecentErrors } from "@/lib/usage/queries";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { ErrorProviderFilter } from "@/components/errors/error-provider-filter";
+import { ProjectProviderFilter } from "@/components/dashboard/project-provider-filter";
 
 const PAGE_SIZE = 25;
 
 export default async function ErrorsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; providerId?: string }>;
+  searchParams: Promise<{ page?: string; projectId?: string; providerId?: string }>;
 }) {
   const params = await searchParams;
   const page = Math.max(1, Number(params.page ?? "1"));
-  const providerId = params.providerId;
+  const { projectId, providerId } = params;
 
   const supabase = await createClient();
-  const [providers, models, { data: errors, count }] = await Promise.all([
+  const [projects, providers, models] = await Promise.all([
+    getProjects(supabase),
     getProviders(supabase),
     getModels(supabase),
-    getRecentErrors(supabase, { page, pageSize: PAGE_SIZE, providerId }),
   ]);
+
+  const providerIdsForProject = projectId ? providers.filter((p) => p.project_id === projectId).map((p) => p.id) : undefined;
+
+  const { data: errors, count } = await getRecentErrors(supabase, {
+    page,
+    pageSize: PAGE_SIZE,
+    providerId,
+    providerIds: providerId ? undefined : providerIdsForProject,
+  });
 
   const providerNameById = new Map(providers.map((p) => [p.id, p.name]));
   const modelNameById = new Map(models.map((m) => [m.id, m.display_name]));
@@ -29,6 +38,7 @@ export default async function ErrorsPage({
 
   function pageHref(target: number) {
     const params = new URLSearchParams();
+    if (projectId) params.set("projectId", projectId);
     if (providerId) params.set("providerId", providerId);
     params.set("page", String(target));
     return `?${params.toString()}`;
@@ -41,7 +51,7 @@ export default async function ErrorsPage({
           <h1 className="text-2xl font-semibold tracking-tight">Errors</h1>
           <p className="text-sm text-muted-foreground">API errors captured during polling or connection tests.</p>
         </div>
-        <ErrorProviderFilter providers={providers} value={providerId} />
+        <ProjectProviderFilter projects={projects} providers={providers} projectId={projectId} providerId={providerId} />
       </div>
 
       {errors && errors.length > 0 ? (

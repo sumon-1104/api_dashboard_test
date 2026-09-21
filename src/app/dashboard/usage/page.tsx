@@ -1,8 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
-import { getProviders, getUsageSummaryByProvider, getUsageTimeline } from "@/lib/usage/queries";
+import { getProjects, getProviders, getUsageSummaryByProvider, getUsageTimeline } from "@/lib/usage/queries";
 import { resolvePreset, type DateRangePreset } from "@/lib/usage/date-range";
 import { toDailyTotals } from "@/lib/usage/chart-data";
 import { DateRangePicker } from "@/components/usage/date-range-picker";
+import { ProjectProviderFilter } from "@/components/dashboard/project-provider-filter";
 import { TokenUsageChart } from "@/components/usage/token-usage-chart";
 import { RequestUsageChart } from "@/components/usage/request-usage-chart";
 import { CostChart } from "@/components/usage/cost-chart";
@@ -13,17 +14,19 @@ const VALID_PRESETS: DateRangePreset[] = ["today", "7d", "30d", "this_month", "l
 export default async function UsagePage({
   searchParams,
 }: {
-  searchParams: Promise<{ range?: string }>;
+  searchParams: Promise<{ range?: string; projectId?: string; providerId?: string }>;
 }) {
   const params = await searchParams;
   const preset = VALID_PRESETS.includes(params.range as DateRangePreset) ? (params.range as DateRangePreset) : "7d";
   const range = resolvePreset(preset);
+  const filter = { projectId: params.projectId, providerId: params.providerId };
 
   const supabase = await createClient();
-  const [providers, timeline, summary] = await Promise.all([
+  const [projects, providers, timeline, summary] = await Promise.all([
+    getProjects(supabase),
     getProviders(supabase),
-    getUsageTimeline(supabase, range),
-    getUsageSummaryByProvider(supabase, range),
+    getUsageTimeline(supabase, range, filter),
+    getUsageSummaryByProvider(supabase, range, filter),
   ]);
 
   const providerNameById = new Map(providers.map((p) => [p.id, p.name]));
@@ -35,12 +38,20 @@ export default async function UsagePage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Usage</h1>
           <p className="text-sm text-muted-foreground">Token, request, and cost trends across all providers.</p>
         </div>
-        <DateRangePicker value={preset} />
+        <div className="flex items-center gap-2">
+          <ProjectProviderFilter
+            projects={projects}
+            providers={providers}
+            projectId={params.projectId}
+            providerId={params.providerId}
+          />
+          <DateRangePicker value={preset} />
+        </div>
       </div>
 
       {dailyTotals.length === 0 ? (

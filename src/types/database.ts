@@ -14,8 +14,17 @@ export type RateLimitSource = "provider_reported" | "response_headers";
 export type AlertLimitType = "usage_limit" | "balance";
 export type AlertChannel = "dashboard" | "slack";
 
+export type Project = {
+  id: string;
+  user_id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export type Provider = {
   id: string;
+  project_id: string;
   name: string;
   slug: string;
   provider_kind: ProviderKind;
@@ -173,6 +182,7 @@ export interface Database {
   public: {
     Tables: {
       profiles: Table<Profile>;
+      projects: Table<Project>;
       providers: Table<Provider>;
       provider_credentials: Table<ProviderCredential>;
       models: Table<Model>;
@@ -185,15 +195,15 @@ export interface Database {
     Views: Record<string, never>;
     Functions: {
       usage_summary_by_provider: {
-        Args: { p_start: string; p_end: string };
+        Args: { p_start: string; p_end: string; p_project_id: string | null; p_provider_id: string | null };
         Returns: UsageSummaryByProviderRow[];
       };
       usage_timeline: {
-        Args: { p_start: string; p_end: string; p_provider_id: string | null };
+        Args: { p_start: string; p_end: string; p_project_id: string | null; p_provider_id: string | null };
         Returns: UsageTimelineFnRow[];
       };
       usage_by_model: {
-        Args: { p_start: string; p_end: string };
+        Args: { p_start: string; p_end: string; p_project_id: string | null; p_provider_id: string | null };
         Returns: UsageByModelFnRow[];
       };
     };

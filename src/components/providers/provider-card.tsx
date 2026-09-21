@@ -22,19 +22,18 @@ export interface ProviderWithCredentials extends Provider {
   }[];
 }
 
-export function ProviderCard({ provider }: { provider: ProviderWithCredentials }) {
+export function ProviderCard({ provider, projectId }: { provider: ProviderWithCredentials; projectId: string }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [showAddForm, setShowAddForm] = useState(provider.credentials.length === 0);
-  const [projectName, setProjectName] = useState("");
   const [keyInput, setKeyInput] = useState("");
   const meta = PROVIDER_DISPLAY_META[provider.slug];
+  const supported = meta?.supported ?? false;
+  const basePath = `/api/projects/${projectId}/providers/${provider.slug}`;
 
   function testCredential(credentialId: string) {
     startTransition(async () => {
-      const res = await fetch(`/api/providers/${provider.slug}/credentials/${credentialId}/test`, {
-        method: "POST",
-      });
+      const res = await fetch(`${basePath}/credentials/${credentialId}/test`, { method: "POST" });
       const body = await res.json();
       if (res.ok && body.ok) {
         toast.success(`${provider.name}: ${body.message}`);
@@ -46,32 +45,31 @@ export function ProviderCard({ provider }: { provider: ProviderWithCredentials }
   }
 
   function removeCredential(credentialId: string, name: string) {
-    if (!window.confirm(`Remove project "${name}"? Its stored key will be deleted; historical usage data is kept.`)) {
+    if (!window.confirm(`Remove key "${name}"? It will be deleted; historical usage data is kept.`)) {
       return;
     }
     startTransition(async () => {
-      const res = await fetch(`/api/providers/${provider.slug}/credentials/${credentialId}`, { method: "DELETE" });
+      const res = await fetch(`${basePath}/credentials/${credentialId}`, { method: "DELETE" });
       if (res.ok) {
         toast.success(`Removed "${name}".`);
         router.refresh();
       } else {
         const body = await res.json().catch(() => ({}));
-        toast.error(body.error ?? "Failed to remove project");
+        toast.error(body.error ?? "Failed to remove key");
       }
     });
   }
 
-  function addProject() {
-    if (!projectName.trim() || !keyInput.trim()) return;
+  function addKey() {
+    if (!keyInput.trim()) return;
     startTransition(async () => {
-      const res = await fetch(`/api/providers/${provider.slug}/credentials`, {
+      const res = await fetch(`${basePath}/credentials`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: keyInput.trim(), name: projectName.trim() }),
+        body: JSON.stringify({ apiKey: keyInput.trim() }),
       });
       if (res.ok) {
-        toast.success(`Project "${projectName.trim()}" added.`);
-        setProjectName("");
+        toast.success(`Key saved.`);
         setKeyInput("");
         setShowAddForm(false);
         router.refresh();
@@ -84,7 +82,7 @@ export function ProviderCard({ provider }: { provider: ProviderWithCredentials }
 
   function toggleEnabled(enabled: boolean) {
     startTransition(async () => {
-      const res = await fetch(`/api/providers/${provider.slug}`, {
+      const res = await fetch(basePath, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled }),
@@ -109,8 +107,15 @@ export function ProviderCard({ provider }: { provider: ProviderWithCredentials }
           <Switch checked={provider.enabled} onCheckedChange={toggleEnabled} disabled={isPending} />
         </div>
 
+        {!supported && (
+          <p className="text-xs text-amber-600 dark:text-amber-500">
+            No live integration yet for this provider — keys are stored, but Test Connection and polling
+            aren&apos;t available until real support is added.
+          </p>
+        )}
+
         {provider.credentials.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No projects added yet.</p>
+          <p className="text-sm text-muted-foreground">No keys added yet.</p>
         ) : (
           <div className="space-y-2">
             {provider.credentials.map((cred) => (
@@ -126,7 +131,12 @@ export function ProviderCard({ provider }: { provider: ProviderWithCredentials }
                     : "Never tested"}
                 </p>
                 <div className="mt-2 flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => testCredential(cred.id)} disabled={isPending}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => testCredential(cred.id)}
+                    disabled={isPending || !supported}
+                  >
                     Test Connection
                   </Button>
                   <Button
@@ -143,15 +153,10 @@ export function ProviderCard({ provider }: { provider: ProviderWithCredentials }
           </div>
         )}
 
-        {meta && <p className="text-xs text-muted-foreground">Key source: {meta.adminKeyHelp}</p>}
+        {meta?.adminKeyHelp && <p className="text-xs text-muted-foreground">Key source: {meta.adminKeyHelp}</p>}
 
         {showAddForm ? (
           <div className="space-y-2 rounded-md border border-dashed p-3">
-            <Input
-              placeholder="Project name"
-              value={projectName}
-              onChange={(e) => setProjectName(e.target.value)}
-            />
             <Input
               type="password"
               placeholder="Paste API key"
@@ -159,8 +164,8 @@ export function ProviderCard({ provider }: { provider: ProviderWithCredentials }
               onChange={(e) => setKeyInput(e.target.value)}
             />
             <div className="flex gap-2">
-              <Button size="sm" onClick={addProject} disabled={isPending || !projectName.trim() || !keyInput.trim()}>
-                Add project
+              <Button size="sm" onClick={addKey} disabled={isPending || !keyInput.trim()}>
+                Save key
               </Button>
               {provider.credentials.length > 0 && (
                 <Button variant="ghost" size="sm" onClick={() => setShowAddForm(false)} disabled={isPending}>
@@ -171,7 +176,7 @@ export function ProviderCard({ provider }: { provider: ProviderWithCredentials }
           </div>
         ) : (
           <Button variant="outline" size="sm" onClick={() => setShowAddForm(true)} disabled={isPending}>
-            + Add project
+            {provider.credentials.length > 0 ? "Replace key" : "+ Add key"}
           </Button>
         )}
       </CardContent>

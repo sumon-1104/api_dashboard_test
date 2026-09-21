@@ -71,30 +71,24 @@ Fill in:
 | `SLACK_WEBHOOK_URL` | Optional — see [Slack alerts](#slack-alerts) |
 | `ALERT_THRESHOLD_PCTS` | Optional — comma-separated usage-percent thresholds, defaults to `50,75,90,100` |
 
-### 5. Seed the providers
-
-```bash
-npm run seed
-```
-
-This inserts the three v1 provider rows (OpenAI, Gemini, Anthropic). It does **not** seed any model
-rows or pricing — model identifiers and pricing change too often to hardcode honestly. Models appear
-automatically the first time usage is polled (with pricing left `null`), or you can add one manually
-on the Models page.
-
-### 6. Run the app
+### 5. Run the app
 
 ```bash
 npm run dev
 ```
 
 Visit `http://localhost:3000`. The first visit to `/login` lets you create an account via the
-"Create account" tab — every authenticated user is treated as an admin in v1 (see `CLAUDE.md`).
+"Create account" tab. Projects (and everything under them) are scoped to the user who created them —
+see `CLAUDE.md` § Projects → Providers → API keys.
 
 ## Provider configuration
 
-Go to **Dashboard → Providers** and paste in a key for each provider you want to monitor. These are
-**not** the same as a normal API key for two of the three:
+Go to **Dashboard → Projects**, create a project, then open it and add a provider from the catalog
+(OpenAI, Anthropic, Gemini, plus Tavily/xAI/DeepSeek/Mistral/Perplexity as name+key placeholders — or
+a custom name) and paste in a key for it. Nothing is seeded automatically: models appear the first
+time real usage is polled (with pricing left `null`) or you add one manually on the Models page, and
+providers are added interactively, not from a fixed list. Admin-tier keys are **not** the same as a
+normal API key for two of the three real integrations:
 
 ### OpenAI — needs an Admin API key
 
@@ -176,7 +170,6 @@ npm run dev         # start the dev server
 npm run lint         # ESLint
 npm run typecheck    # tsc --noEmit
 npm run test          # vitest
-npm run seed          # seed the three v1 providers
 ```
 
 ## Deployment

@@ -10,12 +10,18 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const start = url.searchParams.get("start");
   const end = url.searchParams.get("end");
+  const projectId = url.searchParams.get("projectId") ?? undefined;
+  const providerId = url.searchParams.get("providerId") ?? undefined;
   if (!start || !end) {
     return NextResponse.json({ error: "start and end query params (ISO dates) are required" }, { status: 400 });
   }
 
   const supabase = await createClient();
-  const rows = await getUsageSummaryByProvider(supabase, { start: new Date(start), end: new Date(end) });
+  const rows = await getUsageSummaryByProvider(
+    supabase,
+    { start: new Date(start), end: new Date(end) },
+    { projectId, providerId }
+  );
 
   const totals = rows.reduce(
     (acc, r) => ({

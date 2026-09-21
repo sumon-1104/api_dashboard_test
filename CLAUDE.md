@@ -14,22 +14,23 @@ src/
   app/
     login/                      Supabase Auth (email/password), server actions in actions.ts
     dashboard/                  protected routes (layout.tsx checks auth server-side)
-      page.tsx                  Overview
-      providers/                connect/test/enable providers, manage credentials
-      usage/                    charts, date-range filtered
-      models/                   pricing + enable/disable per model
+      page.tsx                  Overview — project/provider filter dropdown, month-to-date summary
+      projects/                 list/create projects; [projectId]/ adds providers + API keys to one
+      usage/                    charts, date-range + project/provider filtered
+      models/                   pricing + enable/disable per model, project/provider filtered
       limits/                   admin-configured usage_limits + provider-reported rate_limits
-      errors/                   paginated api_errors table
+      errors/                   paginated api_errors table, project/provider filtered
       settings/                 Slack config status + recent alerts
     api/
-      providers/                GET list, PATCH enable/disable, POST credentials, POST test
+      projects/                 GET list, POST create; [projectId]/providers/ nests the same
+                                 GET/POST/PATCH/credentials/test routes providers/ used to own directly
       usage/                    GET raw + summary + timeline (aggregated in Postgres)
       models/                   GET list, PATCH pricing/enabled
       limits/                   GET/POST/PUT/DELETE usage_limits
       errors/                   GET paginated api_errors
       cron/poll-usage/          POST, guarded by CRON_SECRET — the only unauthenticated route
     proxy.ts                    session refresh + /dashboard auth redirect (Next 16: not middleware.ts)
-  components/                   dashboard/providers/usage/models/limits/errors, shadcn/ui in ui/
+  components/                   dashboard/projects/providers/usage/models/limits/errors, shadcn/ui in ui/
   lib/
     supabase/                   client.ts (browser), server.ts (RLS-scoped), admin.ts (service role)
     providers/                  the provider abstraction — see below
@@ -40,9 +41,34 @@ src/
     notifications/slack.ts      sendSlackAlert()
     auth/                       requireApiUser (route handlers), requireCronSecret, redirect-rules
   types/database.ts             hand-written types mirroring supabase/migrations/*.sql
-scripts/seed.ts                 seeds the 3 provider rows only — no models, no fake pricing
-supabase/migrations/            0001_init.sql (schema+RLS), 0002_functions.sql (Postgres aggregations)
+supabase/migrations/            0001_init.sql (schema+RLS) … 0005_projects.sql (projects table +
+                                 per-user RLS), 0006_project_filter.sql (project/provider filter params)
 ```
+
+## Projects → Providers → API keys
+
+A **project** (`projects`, owned by `user_id`) is the top-level container a user creates first. Every
+`providers` row now belongs to exactly one project (`providers.project_id`, unique per
+`(project_id, slug)`) instead of being one of 3 fixed global rows — the same slug (`openai`, etc.) can
+exist independently in as many projects as a user creates. Each provider row can still hold multiple
+named `provider_credentials` ("keys"), unchanged from before. `lib/providers/meta.ts`'s
+`PROVIDER_CATALOG` lists every provider a user can add from the Projects UI (OpenAI, Anthropic,
+Gemini, Tavily, xAI, DeepSeek, Mistral, Perplexity) plus an arbitrary custom slug; only entries with
+`supported: true` have a real class in `PROVIDER_FACTORIES` — the rest (and any custom slug) store a
+name + key but have no live Test Connection or polling until real integration work is done for them
+(never fabricate what an unimplemented provider would report).
+
+**Ownership is real RLS now, not just "any authenticated user is an admin."** `projects.user_id` is
+the root of a per-user ownership chain that flows through `providers.project_id` to every table hung
+off a provider (`models`, `usage_records`, `usage_limits`, `rate_limits`, `api_errors`, `alerts`) — see
+`0005_projects.sql`. `lib/providers/registry.ts` and `lib/usage/poll.ts` use the **service-role**
+client and bypass this entirely (the cron poller polls every project's providers system-wide); only
+browser/Server-Component reads through the regular client are ownership-scoped.
+
+`getProviderClient`/`listProviderCredentials` take a **provider id** directly, not a bare slug — a
+slug alone is no longer globally unique once providers are project-scoped, so every caller resolves
+`(projectId, slug) → providerId` first (the nested `/api/projects/[projectId]/providers/[provider]/...`
+routes do this from the URL) before calling into the registry.
 
 ## Provider architecture
 
@@ -105,16 +131,22 @@ though v1 doesn't populate them; `model_id` is nullable for the same reason.
 
 ### Adding a new provider (Tavily, xAI, DeepSeek, Mistral, ...)
 
-1. Add a `providers` row (`slug`, `provider_kind`).
-2. Write `lib/providers/<slug>.ts` implementing `AIProvider`. Re-verify auth requirements and
+Tavily/xAI/DeepSeek/Mistral/Perplexity already exist as `supported: false` entries in
+`PROVIDER_CATALOG` (`lib/providers/meta.ts`) — a user can already add one to a project and store a
+key for it today, it just has no live Test Connection/polling yet. Making one real:
+
+1. Write `lib/providers/<slug>.ts` implementing `AIProvider`. Re-verify auth requirements and
    endpoint paths against current docs before implementing — providers change these, and are not
    symmetric with each other. As researched in September 2026: Tavily's `GET /usage` and DeepSeek's
    `GET /user/balance` both reuse the provider's **standard** key; xAI's billing endpoints need a
    separate **management** key; Mistral's usage metrics need a separate **admin** key (exact path
    unconfirmed — look it up fresh).
-3. Register the slug → `key_type` mapping in `PROVIDER_KEY_TYPE` in `lib/providers/registry.ts`.
-   `provider_credentials.key_type` is plain text, not a fixed enum — document the convention here as
-   you add each one (`'standard'` | `'admin'` | `'management'`).
+2. Register the slug → `key_type` mapping in `PROVIDER_KEY_TYPE`, and the slug → class mapping in
+   `PROVIDER_FACTORIES`, both in `lib/providers/registry.ts`. `provider_credentials.key_type` is plain
+   text, not a fixed enum — document the convention here as you add each one (`'standard'` | `'admin'`
+   | `'management'`).
+3. Flip `supported: true` on its `PROVIDER_CATALOG` entry in `lib/providers/meta.ts` (adding a new
+   entry there first, for a provider not already in the catalog).
 4. If the provider genuinely reports an account balance, implement `getBalance()` — this is what lets
    "Remaining: Provider reported" be wired to something real instead of falling through to
    "Application calculated" or "Unknown."
@@ -123,7 +155,7 @@ though v1 doesn't populate them; `model_id` is nullable for the same reason.
    real `/usage` endpoint, just credit-shaped instead of token-shaped).
 
 No schema migration and no UI rewrite should be needed for a new `llm`-kind provider with a real
-usage/cost API; the Providers page already accepts whatever `key_type` a provider's client declares.
+usage/cost API; the Projects UI already accepts whatever `key_type` a provider's client declares.
 
 ## Remaining usage — three states
 

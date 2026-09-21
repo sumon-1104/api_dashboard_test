@@ -15,7 +15,7 @@ import {
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-  { href: "/dashboard/providers", label: "Providers", icon: Plug },
+  { href: "/dashboard/projects", label: "Projects", icon: Plug },
   { href: "/dashboard/usage", label: "Usage", icon: Gauge },
   { href: "/dashboard/models", label: "Models", icon: Cpu },
   { href: "/dashboard/limits", label: "Limits", icon: ShieldAlert },

@@ -30,22 +30,23 @@ export interface LoadedProviderClient {
 }
 
 /**
- * Lists every stored credential ("project") for a provider slug's key type,
- * oldest first. A provider can have multiple — each is a separate project
- * under the same platform (e.g. two OpenAI orgs), polled independently.
+ * Lists every stored credential ("key") for a specific provider row's key
+ * type, oldest first. A provider can have multiple — each is a separate
+ * account under the same platform (e.g. two OpenAI orgs), polled
+ * independently. Takes `providerId` directly rather than resolving a slug —
+ * a slug is no longer globally unique once providers are project-scoped, so
+ * callers must already know which provider row they mean.
  */
 export async function listProviderCredentials(
+  providerId: string,
   slug: string
 ): Promise<{ id: string; name: string }[]> {
   const admin = createAdminClient();
-  const { data: provider } = await admin.from("providers").select("id").eq("slug", slug).single();
-  if (!provider) return [];
-
   const keyType = PROVIDER_KEY_TYPE[slug] ?? "standard";
   const { data: credentials } = await admin
     .from("provider_credentials")
     .select("id, name")
-    .eq("provider_id", provider.id)
+    .eq("provider_id", providerId)
     .eq("key_type", keyType)
     .order("created_at", { ascending: true });
 
@@ -57,31 +58,24 @@ export async function listProviderCredentials(
  * AIProvider instance for it. Always goes through the service-role client —
  * this is the only place `provider_credentials.encrypted_api_key` is ever
  * read. Without `credentialId`, falls back to the most recently added
- * credential (used by callers that haven't been updated to target a specific
- * project yet).
+ * credential for this provider row.
  */
-export async function getProviderClient(slug: string, credentialId?: string): Promise<LoadedProviderClient> {
+export async function getProviderClient(
+  providerId: string,
+  slug: string,
+  credentialId?: string
+): Promise<LoadedProviderClient> {
   const factory = PROVIDER_FACTORIES[slug];
   if (!factory) {
     throw new ProviderCredentialError(`No provider client registered for slug "${slug}"`);
   }
 
   const admin = createAdminClient();
-  const { data: provider, error: providerError } = await admin
-    .from("providers")
-    .select("id")
-    .eq("slug", slug)
-    .single();
-
-  if (providerError || !provider) {
-    throw new ProviderCredentialError(`Provider "${slug}" is not configured`);
-  }
-
   const keyType = PROVIDER_KEY_TYPE[slug] ?? "standard";
   let query = admin
     .from("provider_credentials")
     .select("id, encrypted_api_key")
-    .eq("provider_id", provider.id)
+    .eq("provider_id", providerId)
     .eq("key_type", keyType);
 
   query = credentialId
@@ -92,7 +86,7 @@ export async function getProviderClient(slug: string, credentialId?: string): Pr
 
   if (credentialError || !credential) {
     throw new ProviderCredentialError(
-      `No "${keyType}" credential stored for "${slug}". Add one on the Providers page.`
+      `No "${keyType}" credential stored for "${slug}". Add one on this project's page.`
     );
   }
 
