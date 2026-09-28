@@ -87,3 +87,21 @@ describe("TavilyProvider — no cost/balance/model data", () => {
     expect(await provider.getModels()).toBeNull();
   });
 });
+
+describe("TavilyProvider — real HTTP failures must propagate, not disappear as null", () => {
+  // A broken/expired key must surface as a poll failure (see poll.ts's
+  // per-credential try/catch), never as "polled successfully, zero credits
+  // used" — those are different facts and collapsing them misreports a
+  // broken credential as a legitimately idle one.
+  it("getUsage rejects on a real HTTP error instead of swallowing it", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(401, { error: "invalid" })));
+
+    await expect(new TavilyProvider("bad").getUsage()).rejects.toThrow();
+  });
+
+  it("getRateLimits rejects on a real HTTP error instead of swallowing it", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(401, { error: "invalid" })));
+
+    await expect(new TavilyProvider("bad").getRateLimits()).rejects.toThrow();
+  });
+});

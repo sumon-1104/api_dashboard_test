@@ -74,20 +74,22 @@ export class TavilyProvider implements AIProvider {
   }
 
   async getUsage(): Promise<UsageReport | null> {
-    try {
-      const res = await this.fetchUsage();
-      const k = res.key;
-      const creditBuckets: UsageCreditsBucket[] = [
-        { endpoint: "search", creditsUsed: k.search_usage, requestCount: null },
-        { endpoint: "extract", creditsUsed: k.extract_usage, requestCount: null },
-        { endpoint: "crawl", creditsUsed: k.crawl_usage, requestCount: null },
-        { endpoint: "map", creditsUsed: k.map_usage, requestCount: null },
-        { endpoint: "research", creditsUsed: k.research_usage, requestCount: null },
-      ];
-      return { kind: "search", creditBuckets };
-    } catch {
-      return null;
-    }
+    // Deliberately does NOT catch here: an HTTP failure (bad key, network
+    // error) must propagate to the poller's per-credential try/catch
+    // (lib/usage/poll.ts) so it's recorded as a real failure, not silently
+    // reported as "polled successfully, zero credits used" — those are very
+    // different facts and collapsing them would misreport a broken
+    // credential as a legitimately idle one.
+    const res = await this.fetchUsage();
+    const k = res.key;
+    const creditBuckets: UsageCreditsBucket[] = [
+      { endpoint: "search", creditsUsed: k.search_usage, requestCount: null },
+      { endpoint: "extract", creditsUsed: k.extract_usage, requestCount: null },
+      { endpoint: "crawl", creditsUsed: k.crawl_usage, requestCount: null },
+      { endpoint: "map", creditsUsed: k.map_usage, requestCount: null },
+      { endpoint: "research", creditsUsed: k.research_usage, requestCount: null },
+    ];
+    return { kind: "search", creditBuckets };
   }
 
   async getCost(): Promise<CostReport | null> {
@@ -103,19 +105,17 @@ export class TavilyProvider implements AIProvider {
   }
 
   async getRateLimits(): Promise<RateLimitEntry[] | null> {
-    try {
-      const res = await this.fetchUsage();
-      return [
-        {
-          limitType: "plan_credits",
-          currentUsage: res.key.usage,
-          limitValue: res.key.limit,
-          resetAt: null,
-          source: "provider_reported",
-        },
-      ];
-    } catch {
-      return null;
-    }
+    // Same reasoning as getUsage() above — let a real HTTP failure propagate
+    // rather than reporting it as "provider has no rate limit info."
+    const res = await this.fetchUsage();
+    return [
+      {
+        limitType: "plan_credits",
+        currentUsage: res.key.usage,
+        limitValue: res.key.limit,
+        resetAt: null,
+        source: "provider_reported",
+      },
+    ];
   }
 }
