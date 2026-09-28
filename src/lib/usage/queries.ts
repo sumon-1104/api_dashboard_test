@@ -114,12 +114,6 @@ export async function getUsageLimits(supabase: Client) {
   return data;
 }
 
-export async function getRateLimits(supabase: Client) {
-  const { data, error } = await supabase.from("rate_limits").select("*").order("updated_at", { ascending: false });
-  if (error) throw error;
-  return data;
-}
-
 export async function getRecentErrors(
   supabase: Client,
   opts: { page?: number; pageSize?: number; providerId?: string; providerIds?: string[] } = {}

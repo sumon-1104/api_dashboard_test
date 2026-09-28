@@ -21,6 +21,11 @@ export function AddProviderForm({ projectId, existingSlugs }: { projectId: strin
   const available = PROVIDER_CATALOG.filter((p) => !existingSlugs.includes(p.slug));
   const isCustom = slug === CUSTOM_VALUE;
 
+  // base-ui's Select.Value renders the raw value (a slug) unless told how to
+  // format it — it doesn't auto-derive the label from SelectItem's children.
+  const providerLabel: Record<string, string> = { [CUSTOM_VALUE]: "Custom..." };
+  for (const p of available) providerLabel[p.slug] = `${p.name}${!p.supported ? " (coming soon)" : ""}`;
+
   function submit() {
     const finalSlug = isCustom
       ? customSlug.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
@@ -56,7 +61,7 @@ export function AddProviderForm({ projectId, existingSlugs }: { projectId: strin
         <Label>Provider</Label>
         <Select value={slug} onValueChange={(v) => v && setSlug(v)}>
           <SelectTrigger className="w-56">
-            <SelectValue placeholder="Choose a provider" />
+            <SelectValue placeholder="Choose a provider">{(value: string) => providerLabel[value] ?? value}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             {available.map((p) => (

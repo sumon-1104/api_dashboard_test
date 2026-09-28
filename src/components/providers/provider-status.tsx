@@ -7,7 +7,17 @@ const VARIANTS: Record<Status, { label: string; className: string }> = {
   error: { label: "Error", className: "bg-destructive text-white" },
 };
 
-export function ProviderStatus({ status }: { status: Status }) {
+// `status` only records the result of the last connection test/poll — it
+// doesn't know whether the provider is currently enabled. A disabled
+// provider that was successfully tested before being turned off would
+// otherwise still show a green "Connected" badge, which visibly contradicts
+// counts elsewhere (e.g. Overview's "Active Providers") that correctly
+// require enabled AND connected. Passing `enabled={false}` overrides the
+// status-derived badge so the two never disagree.
+export function ProviderStatus({ status, enabled = true }: { status: Status; enabled?: boolean }) {
+  if (!enabled) {
+    return <Badge className="bg-muted text-muted-foreground">Disabled</Badge>;
+  }
   const variant = VARIANTS[status];
   return <Badge className={variant.className}>{variant.label}</Badge>;
 }

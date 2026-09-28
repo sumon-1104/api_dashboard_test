@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 import { getProviderClient, listProviderCredentials } from "@/lib/providers/registry";
 import { ProviderCredentialError } from "@/lib/providers/types";
+import { ProviderHttpError } from "@/lib/providers/http";
 
 type AdminClient = SupabaseClient<Database>;
 
@@ -212,7 +213,14 @@ export async function pollProvider(admin: AdminClient, providerId: string, slug:
         );
       }
     } catch (err) {
-      failures.push(`"${credential.name}": ${err instanceof Error ? err.message : "poll failed"}`);
+      const message = err instanceof Error ? err.message : "poll failed";
+      failures.push(`"${credential.name}": ${message}`);
+      await admin.from("api_errors").insert({
+        provider_id: provider.id,
+        status_code: err instanceof ProviderHttpError ? (err.status ?? null) : null,
+        error_code: "poll_failed",
+        message: `"${credential.name}": ${message}`,
+      });
       continue;
     }
   }

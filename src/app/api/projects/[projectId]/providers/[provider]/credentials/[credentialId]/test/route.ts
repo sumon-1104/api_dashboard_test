@@ -4,7 +4,24 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getProviderClient } from "@/lib/providers/registry";
 import { ProviderCredentialError } from "@/lib/providers/types";
+import { ProviderHttpError } from "@/lib/providers/http";
 import { resolveModelId } from "@/lib/usage/poll";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/database";
+
+async function logConnectionFailure(
+  admin: SupabaseClient<Database>,
+  providerId: string,
+  message: string,
+  statusCode: number | null
+) {
+  await admin.from("api_errors").insert({
+    provider_id: providerId,
+    status_code: statusCode,
+    error_code: "connection_failed",
+    message,
+  });
+}
 
 // Tests one specific credential under one specific provider row. Verifies
 // project ownership via the regular client first (same reasoning as the
@@ -46,6 +63,10 @@ export async function POST(
       .update({ status: result.ok ? "connected" : "error" })
       .eq("id", provider.id);
 
+    if (!result.ok) {
+      await logConnectionFailure(admin, provider.id, result.message, null);
+    }
+
     if (result.ok && result.usageSample) {
       const modelId = await resolveModelId(admin, provider.id, result.usageSample.modelName);
       await admin.from("usage_records").insert({
@@ -66,12 +87,14 @@ export async function POST(
 
     return NextResponse.json(result, { status: result.ok ? 200 : 400 });
   } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    const statusCode = err instanceof ProviderHttpError ? (err.status ?? null) : null;
+    await logConnectionFailure(admin, provider.id, message, statusCode);
+    await admin.from("providers").update({ status: "error" }).eq("id", provider.id);
+
     if (err instanceof ProviderCredentialError) {
       return NextResponse.json({ ok: false, message: err.message }, { status: 400 });
     }
-    return NextResponse.json(
-      { ok: false, message: err instanceof Error ? err.message : "Unknown error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, message }, { status: 500 });
   }
 }

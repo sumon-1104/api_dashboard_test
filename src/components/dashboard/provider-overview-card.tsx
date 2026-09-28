@@ -36,7 +36,7 @@ export function ProviderOverviewCard({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-base">{provider.name}</CardTitle>
-        <ProviderStatus status={provider.status} />
+        <ProviderStatus status={provider.status} enabled={provider.enabled} />
       </CardHeader>
       <CardContent className="space-y-3">
         {isCreditBased ? (
@@ -66,9 +66,6 @@ export function ProviderOverviewCard({
           </div>
         )}
         {!isCreditBased && <RemainingQuota quota={remaining} unit="tokens" />}
-        {isCreditBased && (
-          <p className="text-xs text-muted-foreground">Plan limit and cycle usage — see Limits page.</p>
-        )}
       </CardContent>
     </Card>
   );

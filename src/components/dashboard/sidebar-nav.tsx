@@ -8,7 +8,6 @@ import {
   Plug,
   Gauge,
   Cpu,
-  ShieldAlert,
   AlertTriangle,
   Settings,
 } from "lucide-react";
@@ -18,7 +17,6 @@ const NAV_ITEMS = [
   { href: "/dashboard/projects", label: "Projects", icon: Plug },
   { href: "/dashboard/usage", label: "Usage", icon: Gauge },
   { href: "/dashboard/models", label: "Models", icon: Cpu },
-  { href: "/dashboard/limits", label: "Limits", icon: ShieldAlert },
   { href: "/dashboard/errors", label: "Errors", icon: AlertTriangle },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];

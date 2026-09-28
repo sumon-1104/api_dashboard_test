@@ -28,6 +28,8 @@ export function ProviderCard({ provider, projectId }: { provider: ProviderWithCr
   const [showAddForm, setShowAddForm] = useState(provider.credentials.length === 0);
   const [keyInput, setKeyInput] = useState("");
   const [extraFieldInput, setExtraFieldInput] = useState("");
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState(provider.name);
   const meta = PROVIDER_DISPLAY_META[provider.slug];
   const supported = meta?.supported ?? false;
   const extraConfigField = meta?.extraConfigField;
@@ -99,14 +101,98 @@ export function ProviderCard({ provider, projectId }: { provider: ProviderWithCr
     });
   }
 
+  function saveName() {
+    const trimmed = nameInput.trim();
+    if (!trimmed || trimmed === provider.name) {
+      setIsEditingName(false);
+      setNameInput(provider.name);
+      return;
+    }
+    startTransition(async () => {
+      const res = await fetch(basePath, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      if (res.ok) {
+        toast.success("Provider renamed.");
+        setIsEditingName(false);
+        router.refresh();
+      } else {
+        const body = await res.json().catch(() => ({}));
+        toast.error(body.error ?? "Failed to rename provider");
+      }
+    });
+  }
+
+  function removeProvider() {
+    const warning =
+      provider.credentials.length > 0
+        ? `Remove "${provider.name}"? This deletes its ${provider.credentials.length} key(s) AND all usage history, models, and error logs collected under it — this cannot be undone.`
+        : `Remove "${provider.name}"? This cannot be undone.`;
+    if (!window.confirm(warning)) return;
+    startTransition(async () => {
+      const res = await fetch(basePath, { method: "DELETE" });
+      if (res.ok) {
+        toast.success(`Removed "${provider.name}".`);
+        router.refresh();
+      } else {
+        const body = await res.json().catch(() => ({}));
+        toast.error(body.error ?? "Failed to remove provider");
+      }
+    });
+  }
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between space-y-0">
-        <div>
-          <CardTitle>{provider.name}</CardTitle>
+        <div className="flex-1">
+          {isEditingName ? (
+            <div className="flex items-center gap-2">
+              <Input
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") saveName();
+                  if (e.key === "Escape") {
+                    setIsEditingName(false);
+                    setNameInput(provider.name);
+                  }
+                }}
+                autoFocus
+                className="h-8 max-w-56"
+              />
+              <Button size="sm" onClick={saveName} disabled={isPending || !nameInput.trim()}>
+                Save
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setIsEditingName(false);
+                  setNameInput(provider.name);
+                }}
+                disabled={isPending}
+              >
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <CardTitle>{provider.name}</CardTitle>
+          )}
           <CardDescription className="capitalize">{provider.provider_kind}-kind provider</CardDescription>
         </div>
-        <ProviderStatus status={provider.status} />
+        <div className="flex items-center gap-2">
+          <ProviderStatus status={provider.status} enabled={provider.enabled} />
+          {!isEditingName && (
+            <Button variant="ghost" size="sm" onClick={() => setIsEditingName(true)} disabled={isPending}>
+              Edit name
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={removeProvider} disabled={isPending}>
+            Remove provider
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex items-center justify-between text-sm">

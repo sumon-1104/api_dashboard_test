@@ -28,6 +28,15 @@ export function ProjectProviderFilter({
 
   const providersForProject = projectId ? providers.filter((p) => p.project_id === projectId) : [];
 
+  // base-ui's Select.Value renders the raw `value` string unless told how to
+  // format it — unlike Radix, it does not automatically pull the matching
+  // SelectItem's children as the label — so the closed trigger needs this
+  // explicit value → display-name lookup.
+  const projectLabel: Record<string, string> = { all: "All projects" };
+  for (const p of projects) projectLabel[p.id] = p.name;
+  const providerLabel: Record<string, string> = { all: "All providers" };
+  for (const p of providersForProject) providerLabel[p.id] = p.name;
+
   function onProjectChange(value: string | null) {
     const params = new URLSearchParams(searchParams.toString());
     if (!value || value === "all") params.delete("projectId");
@@ -47,7 +56,7 @@ export function ProjectProviderFilter({
     <div className="flex gap-2">
       <Select value={projectId ?? "all"} onValueChange={onProjectChange}>
         <SelectTrigger className="w-48">
-          <SelectValue />
+          <SelectValue>{(value: string) => projectLabel[value] ?? value}</SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All projects</SelectItem>
@@ -60,7 +69,7 @@ export function ProjectProviderFilter({
       </Select>
       <Select value={providerId ?? "all"} onValueChange={onProviderChange} disabled={!projectId}>
         <SelectTrigger className="w-48">
-          <SelectValue placeholder="All providers" />
+          <SelectValue placeholder="All providers">{(value: string) => providerLabel[value] ?? value}</SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All providers</SelectItem>

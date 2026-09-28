@@ -21,7 +21,9 @@ export function DateRangePicker({ value }: { value: DateRangePreset }) {
   return (
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger className="w-40">
-        <SelectValue />
+        {/* base-ui's Select.Value renders the raw value unless told how to
+            format it — it doesn't auto-derive the label from SelectItem. */}
+        <SelectValue>{(preset: DateRangePreset) => DATE_RANGE_PRESET_LABELS[preset] ?? preset}</SelectValue>
       </SelectTrigger>
       <SelectContent>
         {PRESETS.map((preset) => (
