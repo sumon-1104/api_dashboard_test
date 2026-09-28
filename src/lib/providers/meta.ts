@@ -10,6 +10,11 @@ export interface ProviderCatalogEntry {
   // integration is written for it — never fabricate what it would report.
   supported: boolean;
   adminKeyHelp?: string;
+  // A provider whose key alone isn't enough (e.g. xAI needs a team_id with
+  // no discovery endpoint) declares the extra non-secret field it needs here
+  // — the Add Key form renders it and it's stored in provider_credentials.config,
+  // never alongside the encrypted key itself.
+  extraConfigField?: { key: string; label: string; placeholder: string };
 }
 
 export const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
@@ -34,11 +39,40 @@ export const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
     supported: true,
     adminKeyHelp: "Google AI Studio API key — used only for a connection test; no usage API exists to poll",
   },
-  { slug: "tavily", name: "Tavily", kind: "search", supported: false },
-  { slug: "xai", name: "xAI", kind: "llm", supported: false },
-  { slug: "deepseek", name: "DeepSeek", kind: "llm", supported: false },
+  {
+    slug: "tavily",
+    name: "Tavily",
+    kind: "search",
+    supported: true,
+    adminKeyHelp: "Standard API key from app.tavily.com — reports credits used per endpoint, not tokens or USD",
+  },
+  {
+    slug: "xai",
+    name: "xAI",
+    kind: "llm",
+    supported: true,
+    adminKeyHelp: "Management key from console.x.ai → Settings → Management Keys",
+    extraConfigField: {
+      key: "teamId",
+      label: "Team ID",
+      placeholder: "Copy from console.x.ai/team/default/settings/team",
+    },
+  },
+  {
+    slug: "deepseek",
+    name: "DeepSeek",
+    kind: "llm",
+    supported: true,
+    adminKeyHelp: "Standard API key from platform.deepseek.com — no usage-by-model API, only live balance",
+  },
   { slug: "mistral", name: "Mistral", kind: "llm", supported: false },
-  { slug: "perplexity", name: "Perplexity", kind: "llm", supported: false },
+  {
+    slug: "perplexity",
+    name: "Perplexity",
+    kind: "llm",
+    supported: true,
+    adminKeyHelp: "Standard API key — no aggregate usage API; only self-logged data from a live Test Connection ping",
+  },
 ];
 
 export const PROVIDER_DISPLAY_META: Record<string, ProviderCatalogEntry> = Object.fromEntries(

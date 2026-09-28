@@ -106,16 +106,49 @@ export async function pollProvider(admin: AdminClient, providerId: string, slug:
     try {
       const [usage, cost] = await Promise.all([client.getUsage(range), client.getCost(range)]);
 
-      // Clear today's snapshot for this project before writing the fresh one.
-      await admin
-        .from("usage_records")
-        .delete()
-        .eq("provider_id", provider.id)
-        .eq("credential_id", credentialId)
-        .eq("source", "provider_polled")
-        .gte("created_at", start.toISOString());
+      // Credit-shaped usage (e.g. Tavily) reports a cumulative total for the
+      // whole billing cycle, not a per-day delta like OpenAI/Anthropic's
+      // bucketed APIs — there's no way to ask "how much was used on just
+      // this day." Replacing only "today's" rows would leave yesterday's
+      // stale cumulative total in place too, and a query spanning both days
+      // would sum them into a double-counted number. So for credit buckets,
+      // every poll replaces this credential's *entire* provider_polled
+      // history instead of just today's slice — always exactly one
+      // up-to-date snapshot per endpoint, never summed across days.
+      if (usage?.creditBuckets) {
+        await admin
+          .from("usage_records")
+          .delete()
+          .eq("provider_id", provider.id)
+          .eq("credential_id", credentialId)
+          .eq("source", "provider_polled");
+      } else {
+        // Clear today's snapshot for this project before writing the fresh one.
+        await admin
+          .from("usage_records")
+          .delete()
+          .eq("provider_id", provider.id)
+          .eq("credential_id", credentialId)
+          .eq("source", "provider_polled")
+          .gte("created_at", start.toISOString());
+      }
 
       const rows: Database["public"]["Tables"]["usage_records"]["Insert"][] = [];
+
+      if (usage?.creditBuckets) {
+        for (const bucket of usage.creditBuckets) {
+          rows.push({
+            provider_id: provider.id,
+            credential_id: credentialId,
+            model_id: null,
+            source: "provider_polled",
+            request_id: `${slug}:${credentialId}:${bucket.endpoint}`,
+            credits_used: bucket.creditsUsed,
+            metadata: bucket.requestCount != null ? { endpoint: bucket.endpoint, requestCount: bucket.requestCount } : { endpoint: bucket.endpoint },
+            status: "success",
+          });
+        }
+      }
 
       if (usage?.tokenBuckets) {
         for (const bucket of usage.tokenBuckets) {

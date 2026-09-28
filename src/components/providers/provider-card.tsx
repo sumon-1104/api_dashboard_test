@@ -27,8 +27,10 @@ export function ProviderCard({ provider, projectId }: { provider: ProviderWithCr
   const [isPending, startTransition] = useTransition();
   const [showAddForm, setShowAddForm] = useState(provider.credentials.length === 0);
   const [keyInput, setKeyInput] = useState("");
+  const [extraFieldInput, setExtraFieldInput] = useState("");
   const meta = PROVIDER_DISPLAY_META[provider.slug];
   const supported = meta?.supported ?? false;
+  const extraConfigField = meta?.extraConfigField;
   const basePath = `/api/projects/${projectId}/providers/${provider.slug}`;
 
   function testCredential(credentialId: string) {
@@ -62,15 +64,20 @@ export function ProviderCard({ provider, projectId }: { provider: ProviderWithCr
 
   function addKey() {
     if (!keyInput.trim()) return;
+    if (extraConfigField && !extraFieldInput.trim()) return;
     startTransition(async () => {
       const res = await fetch(`${basePath}/credentials`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: keyInput.trim() }),
+        body: JSON.stringify({
+          apiKey: keyInput.trim(),
+          ...(extraConfigField ? { config: { [extraConfigField.key]: extraFieldInput.trim() } } : {}),
+        }),
       });
       if (res.ok) {
         toast.success(`Key saved.`);
         setKeyInput("");
+        setExtraFieldInput("");
         setShowAddForm(false);
         router.refresh();
       } else {
@@ -163,8 +170,19 @@ export function ProviderCard({ provider, projectId }: { provider: ProviderWithCr
               value={keyInput}
               onChange={(e) => setKeyInput(e.target.value)}
             />
+            {extraConfigField && (
+              <Input
+                placeholder={extraConfigField.placeholder}
+                value={extraFieldInput}
+                onChange={(e) => setExtraFieldInput(e.target.value)}
+              />
+            )}
             <div className="flex gap-2">
-              <Button size="sm" onClick={addKey} disabled={isPending || !keyInput.trim()}>
+              <Button
+                size="sm"
+                onClick={addKey}
+                disabled={isPending || !keyInput.trim() || (!!extraConfigField && !extraFieldInput.trim())}
+              >
                 Save key
               </Button>
               {provider.credentials.length > 0 && (

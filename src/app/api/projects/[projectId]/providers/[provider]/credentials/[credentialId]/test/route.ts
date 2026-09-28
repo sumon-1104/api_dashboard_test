@@ -58,6 +58,7 @@ export async function POST(
         cached_tokens: result.usageSample.cachedTokens,
         reasoning_tokens: result.usageSample.reasoningTokens,
         total_tokens: result.usageSample.totalTokens,
+        estimated_cost: result.costUsdSample ?? null,
         metadata: result.usageSample.requestCount != null ? { requestCount: result.usageSample.requestCount } : null,
         status: "success",
       });

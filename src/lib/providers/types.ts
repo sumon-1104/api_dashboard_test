@@ -27,11 +27,14 @@ export interface UsageTokensBucket {
 }
 
 // Credit-shaped usage bucket (search providers like Tavily): no tokens, no
-// per-token price, just credits spent per endpoint.
+// per-token price, just credits spent per endpoint. requestCount is nullable
+// because a provider's usage report may report only credits consumed, not a
+// separate request count (e.g. Tavily: one request can cost >1 credit) —
+// never assume a 1:1 ratio.
 export interface UsageCreditsBucket {
   endpoint: string;
   creditsUsed: number;
-  requestCount: number;
+  requestCount: number | null;
 }
 
 export interface UsageReport {
@@ -68,6 +71,10 @@ export interface TestConnectionResult {
   // exposed genuine per-call usage (e.g. Gemini's generateContent ping) —
   // the caller persists this as a 'self_logged' usage_records row.
   usageSample?: UsageTokensBucket;
+  // Set only when that same response also exposed its own real USD cost
+  // (e.g. Perplexity's Agent API returns cost per call) — never a calculated
+  // estimate. Paired with usageSample on the same self_logged row.
+  costUsdSample?: number;
 }
 
 /**

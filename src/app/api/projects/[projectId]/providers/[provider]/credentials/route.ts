@@ -9,6 +9,9 @@ import { PROVIDER_KEY_TYPE } from "@/lib/providers/registry";
 const bodySchema = z.object({
   apiKey: z.string().min(1),
   name: z.string().min(1).default("default"),
+  // Non-secret extra config a provider's key alone doesn't carry (e.g.
+  // xAI's team_id) — see PROVIDER_CATALOG's extraConfigField.
+  config: z.record(z.string(), z.string()).optional(),
 });
 
 // Stores (or rotates) a provider credential. The plaintext key is accepted
@@ -56,6 +59,7 @@ export async function POST(
         key_type: keyType,
         name: parsed.data.name,
         encrypted_api_key: encryptedApiKey,
+        config: parsed.data.config ?? null,
         status: "untested",
         last_tested_at: null,
       },

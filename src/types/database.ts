@@ -40,6 +40,9 @@ export type ProviderCredential = {
   key_type: CredentialKeyType;
   name: string;
   encrypted_api_key: string;
+  // Non-secret extra config a provider's key alone doesn't carry (e.g.
+  // xAI's team_id). Never holds anything secret — that's encrypted_api_key.
+  config: Record<string, unknown> | null;
   status: CredentialStatus;
   last_tested_at: string | null;
   created_at: string;

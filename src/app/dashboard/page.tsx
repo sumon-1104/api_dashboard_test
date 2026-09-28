@@ -143,6 +143,7 @@ export default async function OverviewPage({
                   provider={provider}
                   totalTokens={totalTokens}
                   requestCount={Number(row?.request_count ?? 0)}
+                  creditsUsed={Number(row?.credits_used ?? 0)}
                   costUsd={resolved.costUsd}
                   costSource={resolved.source}
                   remaining={remaining}

@@ -4,9 +4,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { pollProvider } from "@/lib/usage/poll";
 import { evaluateAlerts } from "@/lib/usage/evaluate-alerts";
 
-// Providers this app can actually poll. Gemini is intentionally excluded —
-// it has no aggregate usage/cost API to poll (see lib/providers/gemini.ts).
-const POLLABLE_PROVIDER_SLUGS = ["openai", "anthropic"];
+// Providers this app can actually poll. Gemini and Perplexity are
+// intentionally excluded — neither has an aggregate usage/cost API to poll
+// (see lib/providers/gemini.ts, perplexity.ts); DeepSeek is excluded for the
+// same reason (balance-only, no usage-by-model endpoint). Tavily qualifies
+// despite being credit- not token-shaped — it has a real GET /usage endpoint.
+const POLLABLE_PROVIDER_SLUGS = ["openai", "anthropic", "tavily"];
 
 export async function POST(request: Request) {
   const unauthorized = requireCronSecret(request);

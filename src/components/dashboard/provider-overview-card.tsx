@@ -15,6 +15,7 @@ export function ProviderOverviewCard({
   provider,
   totalTokens,
   requestCount,
+  creditsUsed,
   costUsd,
   costSource,
   remaining,
@@ -22,10 +23,15 @@ export function ProviderOverviewCard({
   provider: Provider;
   totalTokens: number;
   requestCount: number;
+  creditsUsed: number;
   costUsd: number | null;
   costSource: CostSource;
   remaining: RemainingQuotaValue;
 }) {
+  // Search-kind providers (Tavily) report credits per endpoint, not tokens —
+  // showing "Tokens: 0" here would look like no usage happened at all.
+  const isCreditBased = provider.provider_kind === "search";
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -33,24 +39,36 @@ export function ProviderOverviewCard({
         <ProviderStatus status={provider.status} />
       </CardHeader>
       <CardContent className="space-y-3">
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <div>
-            <p className="text-muted-foreground">Tokens</p>
-            <p className="font-medium">{totalTokens.toLocaleString()}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Requests</p>
-            <p className="font-medium">{requestCount.toLocaleString()}</p>
-          </div>
-          <div className="col-span-2">
-            <div className="flex items-center justify-between">
-              <p className="text-muted-foreground">Cost (this period)</p>
-              {COST_SOURCE_LABEL[costSource] && <Badge variant="secondary">{COST_SOURCE_LABEL[costSource]}</Badge>}
+        {isCreditBased ? (
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div className="col-span-2">
+              <p className="text-muted-foreground">Credits used (current cycle)</p>
+              <p className="font-medium">{creditsUsed.toLocaleString()}</p>
             </div>
-            <p className="font-medium">{formatUsd(costUsd)}</p>
           </div>
-        </div>
-        <RemainingQuota quota={remaining} unit="tokens" />
+        ) : (
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div>
+              <p className="text-muted-foreground">Tokens</p>
+              <p className="font-medium">{totalTokens.toLocaleString()}</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Requests</p>
+              <p className="font-medium">{requestCount.toLocaleString()}</p>
+            </div>
+            <div className="col-span-2">
+              <div className="flex items-center justify-between">
+                <p className="text-muted-foreground">Cost (this period)</p>
+                {COST_SOURCE_LABEL[costSource] && <Badge variant="secondary">{COST_SOURCE_LABEL[costSource]}</Badge>}
+              </div>
+              <p className="font-medium">{formatUsd(costUsd)}</p>
+            </div>
+          </div>
+        )}
+        {!isCreditBased && <RemainingQuota quota={remaining} unit="tokens" />}
+        {isCreditBased && (
+          <p className="text-xs text-muted-foreground">Plan limit and cycle usage — see Limits page.</p>
+        )}
       </CardContent>
     </Card>
   );
