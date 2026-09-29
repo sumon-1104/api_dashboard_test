@@ -75,6 +75,39 @@ describe("AnthropicProvider.getUsage", () => {
     ]);
   });
 
+  it("aligns a same-day, mid-day range to UTC day boundaries — the poller's real usage pattern", async () => {
+    // The poller always calls getUsage({start: startOfUtcDay(now), end: now}) —
+    // a non-midnight `end` with bucket_width=1d is rejected by Anthropic with
+    // "Invalid date range: ending date must be after starting date" once it
+    // rounds internally. starting_at must stay floored, ending_at must be
+    // pushed to the *next* midnight so the request spans a real bucket.
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { data: [], has_more: false, next_page: null }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new AnthropicProvider("sk-ant-admin01-test").getUsage({
+      start: new Date("2026-09-28T00:00:00.000Z"),
+      end: new Date("2026-09-28T22:01:28.821Z"),
+    });
+
+    const calledUrl = new URL(fetchMock.mock.calls[0][0] as string);
+    expect(calledUrl.searchParams.get("starting_at")).toBe("2026-09-28T00:00:00.000Z");
+    expect(calledUrl.searchParams.get("ending_at")).toBe("2026-09-29T00:00:00.000Z");
+  });
+
+  it("does not widen an already day-aligned range by an extra day", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(200, { data: [], has_more: false, next_page: null }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new AnthropicProvider("sk-ant-admin01-test").getCost({
+      start: new Date("2026-09-01T00:00:00.000Z"),
+      end: new Date("2026-09-02T00:00:00.000Z"),
+    });
+
+    const calledUrl = new URL(fetchMock.mock.calls[0][0] as string);
+    expect(calledUrl.searchParams.get("starting_at")).toBe("2026-09-01T00:00:00.000Z");
+    expect(calledUrl.searchParams.get("ending_at")).toBe("2026-09-02T00:00:00.000Z");
+  });
+
   it("follows pagination across multiple pages", async () => {
     const fetchMock = vi
       .fn()

@@ -15,6 +15,21 @@ import type {
 const BASE_URL = "https://api.anthropic.com/v1";
 const ANTHROPIC_VERSION = "2023-06-01";
 
+// With bucket_width=1d, Anthropic requires starting_at/ending_at to be
+// UTC day boundaries — a non-midnight ending_at (e.g. "now", which is what
+// the poller always passes for "usage so far today") is rejected with
+// "Invalid date range: ending date must be after starting date" once
+// Anthropic rounds it internally. floor rounds down to that day's midnight;
+// ceil rounds up to the *next* midnight, unless already exactly on one (so
+// a deliberately day-aligned range isn't widened by an extra day).
+function alignToUtcDayBoundary(date: Date, mode: "floor" | "ceil"): Date {
+  const floor = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  if (mode === "floor" || floor.getTime() === date.getTime()) return floor;
+  const ceil = new Date(floor);
+  ceil.setUTCDate(ceil.getUTCDate() + 1);
+  return ceil;
+}
+
 interface AnthropicUsageResult {
   model: string | null;
   uncached_input_tokens: number;
@@ -118,8 +133,8 @@ export class AnthropicProvider implements AIProvider {
 
     do {
       const params = new URLSearchParams({
-        starting_at: range.start.toISOString(),
-        ending_at: range.end.toISOString(),
+        starting_at: alignToUtcDayBoundary(range.start, "floor").toISOString(),
+        ending_at: alignToUtcDayBoundary(range.end, "ceil").toISOString(),
         bucket_width: "1d",
         limit: "31",
       });
@@ -165,8 +180,8 @@ export class AnthropicProvider implements AIProvider {
 
     do {
       const params = new URLSearchParams({
-        starting_at: range.start.toISOString(),
-        ending_at: range.end.toISOString(),
+        starting_at: alignToUtcDayBoundary(range.start, "floor").toISOString(),
+        ending_at: alignToUtcDayBoundary(range.end, "ceil").toISOString(),
         bucket_width: "1d",
         limit: "31",
       });

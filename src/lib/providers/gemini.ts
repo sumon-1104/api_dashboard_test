@@ -54,6 +54,11 @@ export class GeminiProvider implements AIProvider {
             contents: [{ parts: [{ text: "ping" }] }],
             generationConfig: { maxOutputTokens: 1 },
           }),
+          // Under real-world high-demand periods, Gemini can take >15s to
+          // respond even for a successful call (observed directly: a real
+          // ping took ~20s end to end) — the default timeout is too tight
+          // for this provider specifically.
+          timeoutMs: 30_000,
         }
       );
       const usage = res.usageMetadata;

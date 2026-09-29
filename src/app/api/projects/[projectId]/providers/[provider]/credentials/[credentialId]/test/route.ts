@@ -69,7 +69,7 @@ export async function POST(
 
     if (result.ok && result.usageSample) {
       const modelId = await resolveModelId(admin, provider.id, result.usageSample.modelName);
-      await admin.from("usage_records").insert({
+      const { error: insertError } = await admin.from("usage_records").insert({
         provider_id: provider.id,
         credential_id: credentialId,
         model_id: modelId,
@@ -83,6 +83,19 @@ export async function POST(
         metadata: result.usageSample.requestCount != null ? { requestCount: result.usageSample.requestCount } : null,
         status: "success",
       });
+      // A successful provider ping must not be reported as a successful
+      // Test Connection if the usage sample it captured couldn't actually
+      // be saved — that would silently discard real data while claiming
+      // success (this exact failure mode went undetected all session: a
+      // missing DB column made every self-logged insert fail silently).
+      if (insertError) {
+        await logConnectionFailure(
+          admin,
+          provider.id,
+          `Connected, but failed to save the usage sample: ${insertError.message}`,
+          null
+        );
+      }
     }
 
     return NextResponse.json(result, { status: result.ok ? 200 : 400 });

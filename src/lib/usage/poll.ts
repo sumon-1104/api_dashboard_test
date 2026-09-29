@@ -187,7 +187,13 @@ export async function pollProvider(admin: AdminClient, providerId: string, slug:
       }
 
       if (rows.length > 0) {
-        await admin.from("usage_records").insert(rows);
+        // A failed insert here must not be reported as a successful poll —
+        // that would silently discard real usage data while the response
+        // still claims a cost/token total was recorded (this exact failure
+        // mode went undetected all session: a missing DB column made every
+        // insert fail silently while the API kept reporting success).
+        const { error: insertError } = await admin.from("usage_records").insert(rows);
+        if (insertError) throw new Error(`Failed to save usage data: ${insertError.message}`);
       }
 
       // Rate limits (Anthropic only, today): full refresh per project — see CLAUDE.md.
@@ -199,7 +205,7 @@ export async function pollProvider(admin: AdminClient, providerId: string, slug:
         .eq("credential_id", credentialId)
         .eq("source", "provider_reported");
       if (rateLimits && rateLimits.length > 0) {
-        await admin.from("rate_limits").insert(
+        const { error: rateLimitError } = await admin.from("rate_limits").insert(
           rateLimits.map((rl) => ({
             provider_id: provider.id,
             credential_id: credentialId,
@@ -211,6 +217,7 @@ export async function pollProvider(admin: AdminClient, providerId: string, slug:
             source: rl.source,
           }))
         );
+        if (rateLimitError) throw new Error(`Failed to save rate limits: ${rateLimitError.message}`);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "poll failed";
