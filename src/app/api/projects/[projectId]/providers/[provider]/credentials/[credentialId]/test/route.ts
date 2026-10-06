@@ -9,6 +9,9 @@ import { resolveModelId } from "@/lib/usage/poll";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 
+// Gemini's ping alone can take ~20s, longer than Vercel Hobby's 10s default.
+export const maxDuration = 60;
+
 async function logConnectionFailure(
   admin: SupabaseClient<Database>,
   providerId: string,

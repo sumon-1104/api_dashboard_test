@@ -11,6 +11,10 @@ import { evaluateAlerts } from "@/lib/usage/evaluate-alerts";
 // despite being credit- not token-shaped — it has a real GET /usage endpoint.
 const POLLABLE_PROVIDER_SLUGS = ["openai", "anthropic", "tavily"];
 
+// Vercel Hobby's default function limit is 10s; a system-wide poll of several
+// providers can exceed that.
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   const unauthorized = requireCronSecret(request);
   if (unauthorized) return unauthorized;
